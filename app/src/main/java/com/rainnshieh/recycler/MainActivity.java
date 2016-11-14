@@ -9,16 +9,21 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.helper.ItemTouchHelper;
+import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
+import com.rainnshieh.recycler.veiws.RecyclerItemLongClickListener;
 import com.rainnshieh.recycler.veiws.SpacesItemDecoration;
+import com.rainnshieh.recycler.veiws.SwipeLayout;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import static com.rainnshieh.recycler.R.id.swipe;
 
 public class MainActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
 
@@ -27,7 +32,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private BaseQuickAdapter<Message> mBaseQuickAdapter;
     private List<Message> mDatas = new ArrayList<>();
     private ItemTouchHelper mHelper;
-
+    private List<SwipeLayout> mOpendLayout = new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,14 +47,61 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                         .setText(R.id.tv_message,message.message)
                         .setImageResource(R.id.iv_icon,message.img_id)
                         .setText(R.id.tv_time,message.time);
+                SwipeLayout swipelayout = baseViewHolder.getView(swipe);
+                swipelayout.addSwipeListener(new SwipeLayout.SwipeListener() {
+                    @Override
+                    public void onStartOpen(SwipeLayout layout) {
+                        closeAllOpenLayout();
+                    }
+
+                    @Override
+                    public void onOpen(SwipeLayout layout) {
+                        mOpendLayout.add(layout);
+                    }
+
+                    @Override
+                    public void onStartClose(SwipeLayout layout) {
+
+                    }
+
+                    @Override
+                    public void onClose(SwipeLayout layout) {
+                        mOpendLayout.remove(layout);
+                    }
+
+                    @Override
+                    public void onUpdate(SwipeLayout layout, int leftOffset, int topOffset) {
+
+                    }
+
+                    @Override
+                    public void onHandRelease(SwipeLayout layout, float xvel, float yvel) {
+
+                    }
+                });
             }
         };
         mRecyclerView.setAdapter(mBaseQuickAdapter);
         bindItemTouchHerlper();
         mSwitch.setOnCheckedChangeListener(this);
         updateRecyclerView(false);
+        mRecyclerView.addOnItemTouchListener(new RecyclerItemLongClickListener(this,mRecyclerView) {
+            @Override
+            public void onItemLongClick(RecyclerView.ViewHolder viewHolder, View view, int position) {
+                if(position != mDatas.size() - 1){//如果不是最后一个 可以拖动
+                    mHelper.startDrag(viewHolder);
+                }
+            }
+        });
+    }
 
-//        mHelper.startDrag(mViewHolder);
+    private void closeAllOpenLayout() {
+        for (SwipeLayout swipeLayout : mOpendLayout) {
+            if(swipeLayout.getOpenStatus() == SwipeLayout.Status.Open){
+                swipeLayout.close();
+            }
+        }
+        mOpendLayout.clear();
     }
 
     private void bindItemTouchHerlper() {
@@ -74,10 +126,9 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                 }else{
                     dragFlags = ItemTouchHelper.UP|
                             ItemTouchHelper.DOWN;
-                    swipeFlags = ItemTouchHelper.START|
-                            ItemTouchHelper.END;
+//                    swipeFlags = ItemTouchHelper.START|
+//                            ItemTouchHelper.END;
                 }
-
 
                 return makeMovementFlags(dragFlags,swipeFlags);
             }
@@ -86,6 +137,10 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
             public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
                 int fromPosition = viewHolder.getAdapterPosition();
                 int toPosition = target.getAdapterPosition();
+                if(toPosition == mDatas.size() -1){//如果拖到最后一个 只让其拖到倒数第一个这样就不会与最后一个交换了
+                    toPosition --;
+                }
+
                 if(fromPosition < toPosition){
                     for(int i = fromPosition ; i < toPosition; i++){//数据集交换位置
                         Collections.swap(mDatas,i,i+1);
@@ -102,6 +157,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
             @Override//长按的时候改变item背景色
             public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
                 if (actionState != ItemTouchHelper.ACTION_STATE_IDLE) {
+                    closeAllOpenLayout();
                     viewHolder.itemView.setBackgroundColor(Color.LTGRAY);
                     Vibrator vib = (Vibrator)MainActivity.this.getSystemService(Service.VIBRATOR_SERVICE);
                     vib.vibrate(70);//震动70ms
@@ -114,18 +170,20 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
             public void clearView(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
                 super.clearView(recyclerView, viewHolder);
                 viewHolder.itemView.setBackgroundColor(Color.WHITE);
+                mBaseQuickAdapter.notifyDataSetChanged();//这里是因为托完以后有些布局滑出来一点点，更新一下就好了
             }
 
-            @Override//这里可以自己定义是否可以拖拽
+            @Override//这里可以自己定义是否可以拖拽 设置未false 并且为Recyclerview设置长按监听事件调用mHelper.startDrag(mViewHolder);
             public boolean isLongPressDragEnabled() {
-                return super.isLongPressDragEnabled();
+//                return super.isLongPressDragEnabled();//默认为true
+                return false;
             }
 
             @Override
             public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
-                int positon  = viewHolder.getAdapterPosition();
-                mBaseQuickAdapter.notifyItemRemoved(positon);
-                mDatas.remove(positon);
+//                int positon  = viewHolder.getAdapterPosition();
+//                mBaseQuickAdapter.notifyItemRemoved(positon);
+//                mDatas.remove(positon);
             }
         });
         mHelper.attachToRecyclerView(mRecyclerView);
